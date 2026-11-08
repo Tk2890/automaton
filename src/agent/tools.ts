@@ -25,6 +25,32 @@ import { createLogger } from "../observability/logger.js";
 
 const logger = createLogger("tools");
 
+/**
+ * Evaluate the replication policy for this automaton.
+ * Returns profit (null if any balance could not be read), policy and child flag.
+ */
+async function getReplicationContext(ctx: any) {
+  const { resolveReplicationPolicy, isChildAutomaton, computeProfitCents } =
+    await import("../replication/policy.js");
+  const { getAutomatonDir } = await import("../identity/wallet.js");
+  const policy = resolveReplicationPolicy(ctx.config.replicationPolicy);
+  const isChild = isChildAutomaton(ctx.config.parentAddress, getAutomatonDir());
+  let profitCents: number | null = null;
+  try {
+    const creditsCents = await ctx.conway.getCreditsBalance();
+    const { getUsdcBalance } = await import("../conway/x402.js");
+    const chainType = ctx.config.chainType || ctx.identity.chainType || "evm";
+    const network = chainType === "solana" ? "solana:mainnet" : "eip155:8453";
+    const usdc = await getUsdcBalance(ctx.identity.address, network, chainType);
+    if (Number.isFinite(creditsCents) && Number.isFinite(usdc)) {
+      profitCents = computeProfitCents(creditsCents, usdc * 100, policy);
+    }
+  } catch {
+    profitCents = null;
+  }
+  return { policy, isChild, profitCents };
+}
+
 // ─── Path Confinement ─────────────────────────────────────────
 // write_file is restricted to the sandbox home directory tree.
 // The sandbox home is /root for both local and remote execution.
@@ -1624,6 +1650,17 @@ Model: ${ctx.inference.getDefaultModel()}
           await import("../replication/genesis.js");
         const { spawnChild } = await import("../replication/spawn.js");
         const { ChildLifecycle } = await import("../replication/lifecycle.js");
+        const { checkSpawnAllowed } = await import("../replication/policy.js");
+
+        // Hard replication gate: only replicate when proven profitable.
+        const rep = await getReplicationContext(ctx);
+        const activeChildren = ctx.db.getChildren().filter(
+          (c) => c.status !== "dead" && c.status !== "cleaned_up" && c.status !== "failed",
+        ).length;
+        const decision = checkSpawnAllowed({ ...rep, activeChildren });
+        if (!decision.allowed) {
+          return `Blocked by replication policy: ${decision.reason}`;
+        }
 
         // Validate genesis params first
         validateGenesisParams({
@@ -1752,6 +1789,19 @@ Model: ${ctx.inference.getDefaultModel()}
         const amount = args.amount_cents as number;
         if (!Number.isFinite(amount) || amount <= 0) {
           return `Blocked: amount_cents must be a positive number, got ${amount}.`;
+        }
+
+        {
+          const { checkFundAllowed } = await import("../replication/policy.js");
+          const rep = await getReplicationContext(ctx);
+          const decision = checkFundAllowed({
+            ...rep,
+            amountCents: amount,
+            alreadyFundedCents: child.fundedAmountCents ?? 0,
+          });
+          if (!decision.allowed) {
+            return `Blocked by replication policy: ${decision.reason}`;
+          }
         }
 
         const balance = await ctx.conway.getCreditsBalance();

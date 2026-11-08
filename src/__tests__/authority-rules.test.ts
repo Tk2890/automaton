@@ -28,7 +28,17 @@ import type {
   TreasuryPolicy,
   LimitCheckResult,
 } from "../types.js";
-import { DEFAULT_TREASURY_POLICY } from "../types.js";
+import { DEFAULT_TREASURY_POLICY as BUDGET_TREASURY_POLICY } from "../types.js";
+
+// Rule-mechanics tests below run against the upstream treasury limits; the
+// fork's budget-sized defaults are asserted in "Treasury Config".
+const DEFAULT_TREASURY_POLICY = {
+  ...BUDGET_TREASURY_POLICY,
+  maxSingleTransferCents: 5000,
+  maxHourlyTransferCents: 10000,
+  maxDailyTransferCents: 25000,
+  maxInferenceDailyCents: 50000,
+};
 import { PolicyEngine } from "../agent/policy-engine.js";
 import { createAuthorityRules } from "../agent/policy-rules/authority.js";
 import { createRateLimitRules } from "../agent/policy-rules/rate-limits.js";
@@ -673,15 +683,16 @@ describe("Financial Phase 1 Rules", () => {
 
 describe("Treasury Config", () => {
   it("DEFAULT_TREASURY_POLICY has all required fields", () => {
-    expect(DEFAULT_TREASURY_POLICY.maxSingleTransferCents).toBe(5000);
-    expect(DEFAULT_TREASURY_POLICY.maxHourlyTransferCents).toBe(10000);
-    expect(DEFAULT_TREASURY_POLICY.maxDailyTransferCents).toBe(25000);
+    // Budget-sized defaults ($20 total budget)
+    expect(BUDGET_TREASURY_POLICY.maxSingleTransferCents).toBe(500);
+    expect(BUDGET_TREASURY_POLICY.maxHourlyTransferCents).toBe(500);
+    expect(BUDGET_TREASURY_POLICY.maxDailyTransferCents).toBe(1000);
+    expect(BUDGET_TREASURY_POLICY.maxInferenceDailyCents).toBe(200);
     expect(DEFAULT_TREASURY_POLICY.minimumReserveCents).toBe(1000);
     expect(DEFAULT_TREASURY_POLICY.maxX402PaymentCents).toBe(100);
     expect(DEFAULT_TREASURY_POLICY.x402AllowedDomains).toEqual(["conway.tech"]);
     expect(DEFAULT_TREASURY_POLICY.transferCooldownMs).toBe(0);
     expect(DEFAULT_TREASURY_POLICY.maxTransfersPerTurn).toBe(2);
-    expect(DEFAULT_TREASURY_POLICY.maxInferenceDailyCents).toBe(50000);
     expect(DEFAULT_TREASURY_POLICY.requireConfirmationAboveCents).toBe(1000);
   });
 

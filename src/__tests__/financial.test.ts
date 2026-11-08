@@ -31,7 +31,18 @@ import type {
   LimitCheckResult,
   ToolContext,
 } from "../types.js";
-import { DEFAULT_TREASURY_POLICY } from "../types.js";
+import { DEFAULT_TREASURY_POLICY as BUDGET_TREASURY_POLICY } from "../types.js";
+
+// These tests exercise rule mechanics against the upstream treasury limits.
+// The fork ships lower, budget-sized defaults; pin the upstream numbers here
+// so the assertions below keep testing the same thresholds.
+const DEFAULT_TREASURY_POLICY = {
+  ...BUDGET_TREASURY_POLICY,
+  maxSingleTransferCents: 5000,
+  maxHourlyTransferCents: 10000,
+  maxDailyTransferCents: 25000,
+  maxInferenceDailyCents: 50000,
+};
 
 // ─── Test Helpers ───────────────────────────────────────────────
 

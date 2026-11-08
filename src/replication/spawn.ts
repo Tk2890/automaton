@@ -18,6 +18,14 @@ import type { ChildLifecycle } from "./lifecycle.js";
 import { ulid } from "ulid";
 import { propagateConstitution } from "./constitution.js";
 
+/**
+ * Repository children clone their runtime from. Points at the fork so that
+ * children inherit this fork's replication policy. Override with
+ * AUTOMATON_CHILD_REPO_URL.
+ */
+export const CHILD_REPO_URL =
+  process.env.AUTOMATON_CHILD_REPO_URL || "https://github.com/Tk2890/automaton.git";
+
 /** Valid Conway sandbox pricing tiers. */
 const SANDBOX_TIERS = [
   { memoryMb: 512,  vcpu: 1, diskGb: 5 },
@@ -68,7 +76,7 @@ export async function spawnChild(
         c.status !== "cleaned_up" &&
         c.status !== "failed",
     );
-  const maxChildren = (db as any).config?.maxChildren ?? 3;
+  const maxChildren = (db as any).config?.maxChildren ?? 1;
   if (existing.length >= maxChildren) {
     throw new Error(
       `Cannot spawn: already at max children (${maxChildren}). Kill or wait for existing children to die.`,
@@ -129,7 +137,7 @@ export async function spawnChild(
     // Install runtime (on the CHILD sandbox)
     await childConway.exec("apt-get update -qq && apt-get install -y -qq nodejs npm git curl", 120_000);
     await childConway.exec(
-      "git clone https://github.com/Conway-Research/automaton.git /root/automaton && cd /root/automaton && npm install && npm run build",
+      `git clone ${CHILD_REPO_URL} /root/automaton && cd /root/automaton && npm install && npm run build`,
       180_000,
     );
 
@@ -269,7 +277,7 @@ async function spawnChildLegacy(
       120_000,
     );
     await childConway.exec(
-      "git clone https://github.com/Conway-Research/automaton.git /root/automaton && cd /root/automaton && npm install && npm run build",
+      `git clone ${CHILD_REPO_URL} /root/automaton && cd /root/automaton && npm install && npm run build`,
       180_000,
     );
     await childConway.exec("mkdir -p /root/.automaton", 10_000);

@@ -68,6 +68,8 @@ export interface AutomatonConfig {
   parentAddress?: string;
   socialRelayUrl?: string;
   treasuryPolicy?: TreasuryPolicy;
+  /** Hard gate for self-replication (see src/replication/policy.ts). */
+  replicationPolicy?: Partial<import("./replication/policy.js").ReplicationPolicy>;
   // Phase 2 config additions
   soulConfig?: SoulConfig;
   modelStrategy?: ModelStrategyConfig;
@@ -86,7 +88,7 @@ export const DEFAULT_CONFIG: Partial<AutomatonConfig> = {
   logLevel: "info",
   version: "0.2.1",
   skillsDir: "~/.automaton/skills",
-  maxChildren: 3,
+  maxChildren: 1,
   maxTurnsPerCycle: 25,
   childSandboxMemoryMb: 1024,
   socialRelayUrl: "https://social.conway.tech",
@@ -581,15 +583,15 @@ export interface TreasuryPolicy {
 }
 
 export const DEFAULT_TREASURY_POLICY: TreasuryPolicy = {
-  maxSingleTransferCents: 5000,
-  maxHourlyTransferCents: 10000,
-  maxDailyTransferCents: 25000,
+  maxSingleTransferCents: 500,
+  maxHourlyTransferCents: 500,
+  maxDailyTransferCents: 1000,
   minimumReserveCents: 1000,
   maxX402PaymentCents: 100,
   x402AllowedDomains: ['conway.tech'],
   transferCooldownMs: 0,
   maxTransfersPerTurn: 2,
-  maxInferenceDailyCents: 50000,
+  maxInferenceDailyCents: 200,
   requireConfirmationAboveCents: 1000,
 };
 
