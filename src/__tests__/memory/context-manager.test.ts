@@ -89,6 +89,29 @@ describe("createTokenCounter", () => {
   });
 });
 
+describe("createTokenCounter long whitespace-free runs", () => {
+  it("counts a 50k-char run quickly instead of hanging", () => {
+    const counter = createTokenCounter();
+    const start = Date.now();
+    const tokens = counter.countTokens("x".repeat(50_000));
+    expect(Date.now() - start).toBeLessThan(2_000);
+    // heuristic for the run, plus 1 token for the space it is replaced with
+    expect(tokens).toBe(Math.ceil(50_000 / 3.5) + 1);
+  });
+
+  it("still encodes normal text exactly", () => {
+    const counter = createTokenCounter();
+    expect(counter.countTokens("hello world")).toBe(2);
+  });
+
+  it("combines encoded text with heuristic run counts", () => {
+    const counter = createTokenCounter();
+    const run = "a".repeat(700);
+    const tokens = counter.countTokens(`hello ${run} world`);
+    expect(tokens).toBeGreaterThanOrEqual(Math.ceil(700 / 3.5));
+  });
+});
+
 describe("ContextManager.assembleContext", () => {
   it("assembleContext includes system prompt and never cuts it", () => {
     const manager = new ContextManager(fixedTokenCounter(10));

@@ -128,6 +128,25 @@ function formatCacheKey(text: string, model?: string): string {
   return `${model ?? "default"}::${text}`;
 }
 
+/**
+ * Whitespace-free runs at least this long are counted heuristically.
+ * js-tiktoken's BPE merge is quadratic in the length of a single
+ * pre-tokenized piece: a 4k-char run takes ~1s, a 50k-char run minutes.
+ * Base64 blobs, minified code or hashes in tool output would otherwise
+ * freeze the agent loop.
+ */
+export const LONG_RUN_THRESHOLD = 200;
+const LONG_RUN_PATTERN = new RegExp(`\\S{${LONG_RUN_THRESHOLD},}`, "g");
+
+function encodeWithLongRunGuard(encoder: Tiktoken, text: string): number {
+  let heuristicTokens = 0;
+  const encodable = text.replace(LONG_RUN_PATTERN, (run) => {
+    heuristicTokens += Math.ceil(run.length / 3.5);
+    return " ";
+  });
+  return encoder.encode(encodable).length + heuristicTokens;
+}
+
 export function createTokenCounter(): TokenCounter {
   const cache = new Map<string, number>();
   let encoder: Tiktoken | null = null;
@@ -152,7 +171,7 @@ export function createTokenCounter(): TokenCounter {
     let count: number;
     if (encoder) {
       try {
-        count = encoder.encode(normalizedText).length;
+        count = encodeWithLongRunGuard(encoder, normalizedText);
       } catch {
         count = Math.ceil(normalizedText.length / 3.5);
       }
